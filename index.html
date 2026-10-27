@@ -473,11 +473,32 @@
                     <div class="probability-track"><span id="probBBar"></span></div>
                     <span class="probability-value" id="probBValue">0%</span>
                   </div>
+                  <div class="probability-row probability-rest" id="probRestRow" hidden>
+                    <span class="probability-letter">R</span>
+                    <span class="probability-name" id="probRestLabel">No hands</span>
+                    <div class="probability-track"><span id="probRestBar"></span></div>
+                    <span class="probability-value" id="probRestValue">0%</span>
+                  </div>
                 </div>
                 <div class="stage-bottom-actions">
                   <button type="button" class="text-link text-link-small" data-action="camera-toggle" id="gameCameraToggle">Camera on</button>
                   <button type="button" class="text-link text-link-small" data-action="open-settings">Tune</button>
                 </div>
+              </div>
+            </div>
+
+            <div class="threshold-strip">
+              <div class="threshold-strip-head">
+                <div>
+                  <span class="settings-label">GESTURE THRESHOLD</span>
+                  <strong id="stageThresholdHint">Raise it if a resting pose looks like a gesture.</strong>
+                </div>
+                <output class="threshold-output" id="stageThresholdValue" for="stageThresholdRange">70%</output>
+              </div>
+              <div class="threshold-slider-row">
+                <span>Easier</span>
+                <input class="range-input threshold-range" id="stageThresholdRange" type="range" min="50" max="95" step="1" value="70" aria-label="Gesture confidence threshold" />
+                <span>Stricter</span>
               </div>
             </div>
 
@@ -657,8 +678,8 @@
               <h3>Match gestures to A and B</h3>
               <p>
                 In <strong>Gesture settings</strong>, assign your model's classes to
-                the two answer sides. If your labels are simply “Class 1” and “Class
-                2”, choose the order that feels natural.
+                A and B. If you recorded a third “no hands” class, map it as
+                <strong>Rest</strong> so a resting pose can never trigger an answer.
               </p>
             </div>
           </article>
@@ -842,7 +863,7 @@
         </div>
 
         <p class="dialog-lede">
-          Tell the quiz which of your model's classes means A, and which means B.
+          Tell the quiz which classes mean A and B, and which one means “no hands.”
           Then choose how confident and how steady a gesture needs to be.
         </p>
 
@@ -875,6 +896,7 @@
               </label>
               <button type="button" class="swap-button" id="swapSidesButton" aria-label="Swap A and B classes">
                 <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+                <span class="swap-label">Swap A / B</span>
               </button>
               <label class="mapping-select mapping-select-b">
                 <span class="mapping-letter">B</span>
@@ -887,16 +909,28 @@
             <p class="mapping-warning" id="mappingWarning" hidden>
               Pick two different classes to use gesture answers.
             </p>
+
+            <label class="rest-mapping" for="mapRestSelect">
+              <span class="rest-mapping-letter">R</span>
+              <span class="rest-mapping-copy">
+                <small>REST / NO HANDS</small>
+                <select id="mapRestSelect" aria-label="Model class for resting or no hands"></select>
+              </span>
+              <span class="rest-mapping-badge" id="restMappingBadge">Optional</span>
+            </label>
+            <p class="rest-mapping-help">
+              When this class is detected, A and B are ignored. Map your “no hands” class here to stop false answers.
+            </p>
           </div>
         </div>
 
         <div class="setting-block">
           <div class="setting-head">
-            <label for="thresholdRange">Gesture confidence</label>
+            <label for="thresholdRange">Gesture threshold</label>
             <output id="thresholdValue" for="thresholdRange">70%</output>
           </div>
           <input class="range-input" id="thresholdRange" type="range" min="50" max="95" step="1" value="70" />
-          <p class="setting-help">How sure the model must be before your gesture counts. Lower it if gestures get missed.</p>
+          <p class="setting-help">How confident the model must be before A or B counts. Raise it if gestures fire while your hands are down; lower it if real gestures get missed.</p>
         </div>
 
         <div class="setting-block">

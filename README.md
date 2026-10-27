@@ -45,7 +45,8 @@ python3 -m http.server 4173 --bind 127.0.0.1
    - drop the downloaded **`.zip` / folder** under **From local files** (you can also choose the three files: `model.json`, `weights.bin`, `metadata.json`).
 5. Review the **Gesture settings**:
    - assign one model class to **A** and another to **B**,
-   - set the confidence threshold,
+   - map your **No hands / Rest** class to **Rest** (auto-detected when labels mention neutral, idle, rest, no hands, arms down, etc.),
+   - set the gesture threshold — raise it if gestures fire while your hands are down,
    - set how long a pose must be held,
    - mirror the camera to match your training setup (on by default).
 
@@ -83,6 +84,14 @@ assets/fonts/               self-hosted Space Grotesk and Instrument Serif
 serve.py                    tiny local server with webcam-friendly headers
 ```
 
+## Test the gesture rules
+
+```bash
+node --test tests/gesture.test.mjs
+```
+
+The tests cover three-class label mapping, rest/no-hands suppression, and confidence thresholds.
+
 ## Troubleshooting
 
 | Problem | Try this |
@@ -94,7 +103,7 @@ serve.py                    tiny local server with webcam-friendly headers
 | Model URL won't load | The model must be public and the host must allow CORS. The Teachable Machine share URL does. |
 | Model takes a long time | The PoseNet engine is downloaded on first use. Keep the page online and try a hard refresh if the engine fails. |
 | Hands are reversed | Turn **Mirror the camera** off or on to match how the model was recorded; or swap the A / B mapping. |
-| Answers fire while resting | Add a `Neutral` class to the model, raise the confidence threshold, or increase the hold time. |
+| Answers fire while resting | Map the “No hands” class as **Rest** in Gesture settings, raise the gesture threshold, or increase the hold time. |
 
 ## Browser support
 

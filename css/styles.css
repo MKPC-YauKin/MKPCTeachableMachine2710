@@ -1918,7 +1918,7 @@ canvas {
 
 .probability-row {
   display: grid;
-  grid-template-columns: 18px 48px minmax(30px, 1fr) 32px;
+  grid-template-columns: 18px minmax(48px, 96px) minmax(30px, 1fr) 34px;
   align-items: center;
   gap: 7px;
 }
@@ -1973,6 +1973,24 @@ canvas {
   background: var(--lilac);
 }
 
+.probability-rest .probability-letter {
+  border: 1px solid rgba(248, 244, 234, 0.3);
+  background: rgba(248, 244, 234, 0.15);
+  color: var(--paper-soft);
+}
+
+.probability-rest .probability-name {
+  color: rgba(248, 244, 234, 0.42);
+}
+
+.probability-rest .probability-track span {
+  background: rgba(248, 244, 234, 0.38);
+}
+
+.probability-rest .probability-value {
+  color: rgba(248, 244, 234, 0.4);
+}
+
 .probability-value {
   color: rgba(248, 244, 234, 0.52);
   font-size: 8.5px;
@@ -1994,6 +2012,64 @@ canvas {
 
 .stage-bottom .text-link:hover {
   color: var(--paper-soft);
+}
+
+.threshold-strip {
+  margin-top: 10px;
+  padding: 11px 14px 9px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 253, 247, 0.6);
+}
+
+.threshold-strip-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.threshold-strip-head .settings-label {
+  margin-bottom: 3px;
+}
+
+.threshold-strip-head strong {
+  display: block;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.threshold-output {
+  display: inline-flex;
+  min-width: 44px;
+  height: 26px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.threshold-slider-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 7.5px;
+}
+
+.threshold-range {
+  margin: 0;
+  height: 21px;
 }
 
 .stage-tip {
@@ -3476,10 +3552,97 @@ kbd {
   height: 13px;
 }
 
+.swap-label {
+  display: none;
+}
+
 .mapping-warning {
   margin: 10px 0 0;
   color: var(--red);
   font-size: 9px;
+}
+
+.rest-mapping {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.72);
+  cursor: pointer;
+}
+
+.rest-mapping-letter {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper-deep);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rest-mapping-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rest-mapping-copy small {
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.rest-mapping-copy select {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 13px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  outline: none;
+  cursor: pointer;
+}
+
+.rest-mapping-badge {
+  display: inline-flex;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.rest-mapping-badge.is-on {
+  border-color: rgba(39, 121, 92, 0.3);
+  background: #eaf7e7;
+  color: var(--green);
+}
+
+.rest-mapping-help {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 8.5px;
+  line-height: 1.5;
 }
 
 .setting-block {
@@ -3732,6 +3895,12 @@ kbd {
 
 .live-probability-name.is-mapped-b b {
   background: var(--lilac);
+}
+
+.live-probability-name.is-mapped-rest b {
+  border: 1px solid var(--line);
+  background: var(--paper-deep);
+  color: var(--muted);
 }
 
 .live-probability-track {
@@ -4411,6 +4580,11 @@ kbd {
     padding-top: 10px;
   }
 
+  .probability-row {
+    grid-template-columns: 17px 78px minmax(30px, 1fr) 32px;
+    gap: 5px;
+  }
+
   .stage-bottom-actions {
     justify-content: space-between;
   }
@@ -4419,9 +4593,27 @@ kbd {
     font-size: 9px;
   }
 
+  .threshold-strip {
+    padding: 10px 12px 8px;
+    margin-top: 8px;
+  }
+
+  .threshold-strip-head strong {
+    font-size: 9px;
+  }
+
+  .threshold-output {
+    height: 24px;
+    font-size: 14px;
+  }
+
   .stage-tip {
     margin-top: 11px;
     font-size: 9px;
+  }
+
+  .rest-mapping {
+    gap: 8px;
   }
 
   .quiz-card {
@@ -4622,13 +4814,26 @@ kbd {
   }
 
   .swap-button {
+    display: inline-flex;
     width: 100%;
-    height: 24px;
+    height: 27px;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     border-radius: 7px;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .swap-button .icon {
+    width: 12px;
+    height: 12px;
     transform: rotate(90deg);
+  }
+
+  .swap-label {
+    display: inline;
   }
 
   .swap-button:hover .icon {

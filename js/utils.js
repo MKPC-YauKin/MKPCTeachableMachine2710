@@ -1,5 +1,6 @@
 const IDLE_LABEL =
-  /\b(neutral|idle|rest|ready|nothing|none|no hand|standing|still|background)\b/i;
+  /\b(neutral|idle|rest|relaxed|ready|nothing|none|no hands?|standing|still|background|down|lowered)\b/i;
+const REST_MARGIN = 0.1;
 const LEFT_LABEL =
   /\b(left|left[- ]?hand|hand[- ]?1|option[- ]?a)\b|^a$/i;
 const RIGHT_LABEL =
@@ -11,25 +12,75 @@ const RIGHT_LABEL =
  */
 export function autoMapLabels(labels) {
   const indices = labels.map((_, index) => index);
-  const idle = new Set(
-    indices.filter((index) => IDLE_LABEL.test(String(labels[index]))),
-  );
+  const idle = indices.filter((index) => IDLE_LABEL.test(String(labels[index])));
 
   let aIndex = indices.find(
-    (index) => !idle.has(index) && LEFT_LABEL.test(String(labels[index])),
+    (index) => !idle.includes(index) && LEFT_LABEL.test(String(labels[index])),
   );
   let bIndex = indices.find(
     (index) =>
       index !== aIndex &&
-      !idle.has(index) &&
+      !idle.includes(index) &&
       RIGHT_LABEL.test(String(labels[index])),
   );
 
-  const fallbacks = indices.filter((index) => !idle.has(index));
+  const fallbacks = indices.filter((index) => !idle.includes(index));
   if (aIndex == null) aIndex = fallbacks[0] ?? null;
   if (bIndex == null) bIndex = fallbacks.find((index) => index !== aIndex) ?? null;
 
-  return { aIndex, bIndex };
+  // Prefer an explicitly named neutral / no-hands class. For a three-class
+  // A/B/third setup, treat the unused class as rest so "hands down" has a
+  // voice instead of being silently ignored.
+  let restIndex = idle.find((index) => index !== aIndex && index !== bIndex) ?? null;
+  if (restIndex == null && labels.length === 3) {
+    restIndex = indices.find((index) => index !== aIndex && index !== bIndex) ?? null;
+  }
+
+  return { aIndex, bIndex, restIndex };
+}
+
+/**
+ * Decide whether the current probabilities contain an intentional A/B gesture.
+ *
+ * The rest class is deliberately conservative: a gesture must clear the
+ * confidence threshold *and* beat the no-hands class by a small margin. That
+ * prevents a resting pose from being answered as the wrong hand.
+ */
+export function resolveGesture(predictions, mapping, threshold) {
+  const probabilityAt = (index) => {
+    if (index == null) return 0;
+    return Number(predictions?.[index]?.probability) || 0;
+  };
+
+  const a = probabilityAt(mapping.aIndex);
+  const b = probabilityAt(mapping.bIndex);
+  const restMapped =
+    mapping.restIndex != null &&
+    mapping.restIndex !== mapping.aIndex &&
+    mapping.restIndex !== mapping.bIndex;
+  const rest = restMapped ? probabilityAt(mapping.restIndex) : 0;
+  const maxGesture = Math.max(a, b);
+  const effectiveThreshold = Math.min(0.95, Math.max(0.5, Number(threshold) || 0.7));
+  const restBlocked =
+    restMapped && rest > 0 && rest + REST_MARGIN >= maxGesture;
+  const restWinning = restBlocked;
+
+  let side = null;
+  if (!restBlocked && maxGesture >= effectiveThreshold) {
+    side = a >= b ? "A" : "B";
+  }
+
+  return {
+    side,
+    a,
+    b,
+    rest,
+    maxGesture,
+    restMapped,
+    restBlocked,
+    restWinning,
+    threshold: effectiveThreshold,
+  };
 }
 
 /**

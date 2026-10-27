@@ -1,6 +1,7 @@
 import {
   autoMapLabels,
   clamp,
+  resolveGesture,
   validatePoseMetadata,
 } from "./utils.js";
 
@@ -73,7 +74,7 @@ export class PoseEngine {
     this.model = null;
     this.labels = [];
     this.metadata = null;
-    this.mapping = { aIndex: null, bIndex: null };
+    this.mapping = { aIndex: null, bIndex: null, restIndex: null };
     this.threshold = 0.7;
     this.holdMs = 1200;
     this.mirror = true;
@@ -151,12 +152,13 @@ export class PoseEngine {
     this._resetHold();
   }
 
-  setMapping(aIndex, bIndex) {
+  setMapping(aIndex, bIndex, restIndex) {
     const valid = (index) =>
       Number.isInteger(index) && index >= 0 && index < this.labels.length;
     this.mapping = {
       aIndex: valid(aIndex) ? aIndex : null,
       bIndex: valid(bIndex) ? bIndex : null,
+      restIndex: valid(restIndex) ? restIndex : null,
     };
     this._resetHold();
     this.onEvent({ type: "mapping", mapping: { ...this.mapping } });
@@ -439,7 +441,7 @@ export class PoseEngine {
     this.model = null;
     this.labels = [];
     this.metadata = null;
-    this.mapping = { aIndex: null, bIndex: null };
+    this.mapping = { aIndex: null, bIndex: null, restIndex: null };
     this.predictions = [];
     this.lastPose = null;
     this._resetHold();
@@ -622,14 +624,9 @@ export class PoseEngine {
   }
 
   _probabilities() {
-    const probabilityFor = (index) => {
-      if (index == null) return 0;
-      return this.predictions[index]?.probability || 0;
-    };
-
+    const gesture = resolveGesture(this.predictions, this.mapping, this.threshold);
     return {
-      a: probabilityFor(this.mapping.aIndex),
-      b: probabilityFor(this.mapping.bIndex),
+      ...gesture,
       predictions: this.predictions,
       labels: this.labels,
     };
@@ -661,22 +658,16 @@ export class PoseEngine {
 
   _updateDetection(now) {
     const mapped = this._probabilities();
-    const aEligible = mapped.a >= this.threshold;
-    const bEligible = mapped.b >= this.threshold;
-    let side = null;
+    const side = mapped.side;
+    const bestProbability = mapped.maxGesture;
 
-    if (aEligible || bEligible) {
-      side = mapped.a >= mapped.b ? "A" : "B";
-    }
-
-    const bestProbability = Math.max(mapped.a, mapped.b);
     this._updateArmed(now, bestProbability);
 
     if (!this.accepting || !this._armed) {
       this._candidate = null;
       this._progress = 0;
       this._holdFired = false;
-      this._emitPrediction(side, bestProbability);
+      this._emitPrediction(side, bestProbability, mapped);
       return;
     }
 
@@ -684,7 +675,7 @@ export class PoseEngine {
       this._candidate = null;
       this._progress = 0;
       this._holdFired = false;
-      this._emitPrediction(null, bestProbability);
+      this._emitPrediction(null, bestProbability, mapped);
       return;
     }
 
@@ -703,15 +694,16 @@ export class PoseEngine {
       this.onHold(side);
     }
 
-    this._emitPrediction(side, bestProbability);
+    this._emitPrediction(side, bestProbability, mapped);
   }
 
-  _emitPrediction(side, bestProbability) {
+  _emitPrediction(side, bestProbability, mapped = this._probabilities()) {
     this.onPrediction({
       side,
       candidate: this._candidate,
       progress: this._progress,
-      probabilities: this._probabilities(),
+      probabilities: mapped,
+      restWinning: mapped.restWinning,
       armed: this._armed,
       accepting: this.accepting,
       holdMs: this.holdMs,

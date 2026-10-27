@@ -75,6 +75,13 @@ const dom = {
   probBBar: document.getElementById("probBBar"),
   probAValue: document.getElementById("probAValue"),
   probBValue: document.getElementById("probBValue"),
+  probRestRow: document.getElementById("probRestRow"),
+  probRestLabel: document.getElementById("probRestLabel"),
+  probRestBar: document.getElementById("probRestBar"),
+  probRestValue: document.getElementById("probRestValue"),
+  stageThresholdRange: document.getElementById("stageThresholdRange"),
+  stageThresholdValue: document.getElementById("stageThresholdValue"),
+  stageThresholdHint: document.getElementById("stageThresholdHint"),
   stageTipText: document.querySelector("#stageTip span:last-child"),
 
   gameEyebrow: document.getElementById("gameEyebrow"),
@@ -141,6 +148,8 @@ const dom = {
   settingsModelCount: document.getElementById("settingsModelCount"),
   mapASelect: document.getElementById("mapASelect"),
   mapBSelect: document.getElementById("mapBSelect"),
+  mapRestSelect: document.getElementById("mapRestSelect"),
+  restMappingBadge: document.getElementById("restMappingBadge"),
   swapSidesButton: document.getElementById("swapSidesButton"),
   mappingWarning: document.getElementById("mappingWarning"),
   thresholdRange: document.getElementById("thresholdRange"),
@@ -166,7 +175,7 @@ const state = {
     status: "disconnected",
     ready: false,
     labels: [],
-    mapping: { aIndex: null, bIndex: null },
+    mapping: { aIndex: null, bIndex: null, restIndex: null },
     metadata: null,
     source: null,
     sourceLabel: "",
@@ -267,7 +276,7 @@ function emptyDetection() {
     side: null,
     candidate: null,
     progress: 0,
-    probabilities: { a: 0, b: 0, predictions: [], labels: [] },
+    probabilities: { a: 0, b: 0, rest: 0, predictions: [], labels: [] },
     armed: true,
     accepting: false,
     holdMs: state.preferences.holdMs,
@@ -584,11 +593,12 @@ function announceModelLoaded() {
   if (!state.model.ready) return;
 
   if (mappingIsReady()) {
+    const restIndex = state.model.mapping.restIndex;
     showToast(
       `Pose model ready. A = ${shortLabel(sideLabel("A"), 18)}, B = ${shortLabel(
         sideLabel("B"),
         18,
-      )}.`,
+      )}${restIndex != null ? `, rest = ${shortLabel(modelLabel(restIndex), 18)}` : ""}.`,
     );
   } else {
     showToast("Pose model connected. Choose which classes mean A and B.");
@@ -715,7 +725,7 @@ function handlePoseEvent(event) {
         status: "disconnected",
         ready: false,
         labels: [],
-        mapping: { aIndex: null, bIndex: null },
+        mapping: { aIndex: null, bIndex: null, restIndex: null },
         metadata: null,
         source: null,
         sourceLabel: "",
@@ -785,6 +795,7 @@ function renderDetection(snapshot) {
   const probabilities = data.probabilities || { a: 0, b: 0, predictions: [] };
   const aProbability = Number(probabilities.a) || 0;
   const bProbability = Number(probabilities.b) || 0;
+  const restProbability = Number(probabilities.rest) || 0;
   const cameraOn = pose.cameraOn || data.cameraOn;
   const ready = state.model.ready;
 
@@ -792,6 +803,8 @@ function renderDetection(snapshot) {
   dom.probBBar.style.width = `${Math.round(bProbability * 100)}%`;
   dom.probAValue.textContent = formatPercent(aProbability);
   dom.probBValue.textContent = formatPercent(bProbability);
+  dom.probRestBar.style.width = `${Math.round(restProbability * 100)}%`;
+  dom.probRestValue.textContent = formatPercent(restProbability);
 
   dom.gameGestureA?.classList.toggle(
     "is-hot",
@@ -838,6 +851,8 @@ function renderDetection(snapshot) {
       liveHint = "Camera ready · add a model to track gestures";
     } else if (!mappingIsReady()) {
       liveHint = "Map your classes to A + B in settings";
+    } else if (data.restWinning) {
+      liveHint = "Resting · no hands detected";
     } else if (data.candidate) {
       liveHint = `Holding ${data.candidate} · ${Math.round(progress * 100)}%`;
     } else if (!data.armed) {
@@ -878,6 +893,12 @@ function getGameHint(data) {
   if (!data.armed) {
     return { text: "Lower your hand to re-arm the detector.", nudge: true };
   }
+  if (data.restWinning) {
+    return {
+      text: "No hands detected. Raise a hand to answer.",
+      nudge: false,
+    };
+  }
   if (data.candidate) {
     const percent = Math.round((data.progress || 0) * 100);
     return {
@@ -901,6 +922,7 @@ function getStageStatus(data) {
   if (!state.model.ready) return "Camera only";
   if (!mappingIsReady()) return "Map gestures";
   if (state.game?.phase === "feedback") return "Locked";
+  if (data.restWinning) return "Resting";
   if (!data.armed) return "Release";
   return "Tracking";
 }
@@ -1087,6 +1109,19 @@ function syncMappingLabels() {
   dom.probBLabel.textContent = bDisplay;
   dom.probALabel.title = aDisplay;
   dom.probBLabel.title = bDisplay;
+
+  const restIndex = state.model.mapping.restIndex;
+  const restMapped = restIndex != null;
+  const restDisplay = restMapped ? modelLabel(restIndex) : "No hands";
+  dom.probRestRow.hidden = !restMapped;
+  dom.probRestLabel.textContent = restDisplay;
+  dom.probRestLabel.title = restDisplay;
+  dom.stageThresholdHint.textContent = restMapped
+    ? "No-hands guard active. Raise it if resting still triggers A/B."
+    : "Raise it if gestures fire while your hands are down.";
+
+  dom.restMappingBadge.textContent = restMapped ? "Active" : "Optional";
+  dom.restMappingBadge.classList.toggle("is-on", restMapped);
 
   if (state.game?.phase === "question") updateQuestionKicker();
   if (dom.settingsDialog.open) {
@@ -1522,12 +1557,10 @@ function renderSettingsUI() {
 
   dom.settingsModelEmpty.hidden = ready;
   dom.settingsModelBody.hidden = !ready;
-  dom.thresholdValue.textContent = formatPercent(state.preferences.threshold);
+  syncThresholdUI();
   dom.holdValue.textContent = formatHold(state.preferences.holdMs);
-  dom.thresholdRange.value = String(Math.round(state.preferences.threshold * 100));
   dom.holdRange.value = String(state.preferences.holdMs);
   dom.mirrorToggle.checked = state.preferences.mirror;
-  updateRangeFill(dom.thresholdRange);
   updateRangeFill(dom.holdRange);
 
   if (!ready) {
@@ -1556,11 +1589,11 @@ function renderSettingsUI() {
   updateSettingsLive(state.detection || emptyDetection());
 }
 
-function buildMappingSelect(select, selectedIndex) {
+function buildMappingSelect(select, selectedIndex, placeholder = "Not assigned") {
   select.replaceChildren();
   const unassigned = document.createElement("option");
   unassigned.value = "";
-  unassigned.textContent = "Not assigned";
+  unassigned.textContent = placeholder;
   select.append(unassigned);
 
   state.model.labels.forEach((label, index) => {
@@ -1578,6 +1611,13 @@ function syncMappingSelects() {
   if (!state.model.ready) return;
   buildMappingSelect(dom.mapASelect, state.model.mapping.aIndex);
   buildMappingSelect(dom.mapBSelect, state.model.mapping.bIndex);
+  buildMappingSelect(dom.mapRestSelect, state.model.mapping.restIndex, "None");
+  dom.restMappingBadge.textContent =
+    state.model.mapping.restIndex == null ? "Optional" : "Active";
+  dom.restMappingBadge.classList.toggle(
+    "is-on",
+    state.model.mapping.restIndex != null,
+  );
 }
 
 function syncMappingWarning() {
@@ -1590,17 +1630,47 @@ function syncMappingWarning() {
       : "";
 }
 
+function mappingIndexFromSelect(select) {
+  return select.value === "" ? null : Number(select.value);
+}
+
+function applyMapping(aIndex, bIndex, restIndex) {
+  pose.setMapping(aIndex, bIndex, restIndex);
+  state.model.mapping = { aIndex, bIndex, restIndex };
+  if (state.screen === "game" && state.game?.phase === "question" && pose.cameraOn) {
+    blockAcceptance(550);
+  }
+  syncMappingSelects();
+  syncMappingLabels();
+  syncMappingWarning();
+  syncSettingsProbabilityMapping();
+  syncChrome();
+  syncAcceptance();
+}
+
 function onMappingSelectChange(side) {
   if (!state.model.ready) return;
 
-  const select = side === "A" ? dom.mapASelect : dom.mapBSelect;
-  const otherSelect = side === "A" ? dom.mapBSelect : dom.mapASelect;
-  const nextIndex = select.value === "" ? null : Number(select.value);
-  let aIndex = side === "A" ? nextIndex : state.model.mapping.aIndex;
-  let bIndex = side === "B" ? nextIndex : state.model.mapping.bIndex;
-
   const oldA = state.model.mapping.aIndex;
   const oldB = state.model.mapping.bIndex;
+  const oldRest = state.model.mapping.restIndex;
+
+  if (side === "R") {
+    const restIndex = mappingIndexFromSelect(dom.mapRestSelect);
+    if (restIndex != null && (restIndex === oldA || restIndex === oldB)) {
+      showToast("The rest class must be different from A and B.", "error");
+      syncMappingSelects();
+      return;
+    }
+    applyMapping(oldA, oldB, restIndex);
+    return;
+  }
+
+  const select = side === "A" ? dom.mapASelect : dom.mapBSelect;
+  const nextIndex = mappingIndexFromSelect(select);
+  let aIndex = side === "A" ? nextIndex : oldA;
+  let bIndex = side === "B" ? nextIndex : oldB;
+  let restIndex = oldRest;
 
   if (aIndex != null && aIndex === bIndex) {
     // Choosing the side that is already in use swaps the two assignments.
@@ -1609,34 +1679,20 @@ function onMappingSelectChange(side) {
     } else {
       aIndex = oldB;
     }
-    otherSelect.value = bIndex == null ? "" : String(bIndex);
   }
 
-  pose.setMapping(aIndex, bIndex);
-  state.model.mapping = { aIndex, bIndex };
-  if (state.screen === "game" && state.game?.phase === "question" && pose.cameraOn) {
-    blockAcceptance(550);
+  // A class can be an answer side or the rest class, not both.
+  if (restIndex != null && (restIndex === aIndex || restIndex === bIndex)) {
+    restIndex = null;
   }
-  syncMappingLabels();
-  syncMappingWarning();
-  syncSettingsProbabilityMapping();
-  syncChrome();
-  syncAcceptance();
+
+  applyMapping(aIndex, bIndex, restIndex);
 }
 
 function swapSides() {
   if (!state.model.ready) return;
-  const { aIndex, bIndex } = state.model.mapping;
-  pose.setMapping(bIndex, aIndex);
-  state.model.mapping = { aIndex: bIndex, bIndex: aIndex };
-  if (state.screen === "game" && state.game?.phase === "question" && pose.cameraOn) {
-    blockAcceptance(550);
-  }
-  syncMappingSelects();
-  syncMappingLabels();
-  syncSettingsProbabilityMapping();
-  syncChrome();
-  syncAcceptance();
+  const { aIndex, bIndex, restIndex } = state.model.mapping;
+  applyMapping(bIndex, aIndex, restIndex);
 }
 
 function buildSettingsProbabilities() {
@@ -1684,13 +1740,21 @@ function buildSettingsProbabilities() {
 
 function syncSettingsProbabilityMapping() {
   if (!state.settingsProbRows.length) return;
-  const { aIndex, bIndex } = state.model.mapping;
+  const { aIndex, bIndex, restIndex } = state.model.mapping;
 
   state.settingsProbRows.forEach(({ row, marker, index }) => {
-    const side = index === aIndex ? "A" : index === bIndex ? "B" : null;
+    const side =
+      index === aIndex
+        ? "A"
+        : index === bIndex
+          ? "B"
+          : index === restIndex
+            ? "R"
+            : null;
     marker.textContent = side || "·";
     row.classList.toggle("is-mapped-a", side === "A");
     row.classList.toggle("is-mapped-b", side === "B");
+    row.classList.toggle("is-mapped-rest", side === "R");
     row.classList.toggle("is-unmapped", !side);
   });
 }
@@ -1719,13 +1783,21 @@ function updateSettingsLive(snapshot) {
    ========================================================================== */
 
 function syncPreferencesUI() {
-  dom.thresholdRange.value = String(Math.round(state.preferences.threshold * 100));
-  dom.thresholdValue.textContent = formatPercent(state.preferences.threshold);
+  syncThresholdUI();
   dom.holdRange.value = String(state.preferences.holdMs);
   dom.holdValue.textContent = formatHold(state.preferences.holdMs);
   dom.mirrorToggle.checked = state.preferences.mirror;
-  updateRangeFill(dom.thresholdRange);
   updateRangeFill(dom.holdRange);
+}
+
+function syncThresholdUI() {
+  const value = Math.round(state.preferences.threshold * 100);
+  dom.thresholdValue.textContent = formatPercent(state.preferences.threshold);
+  dom.stageThresholdValue.textContent = formatPercent(state.preferences.threshold);
+  dom.thresholdRange.value = String(value);
+  dom.stageThresholdRange.value = String(value);
+  updateRangeFill(dom.thresholdRange);
+  updateRangeFill(dom.stageThresholdRange);
 }
 
 function updateRangeFill(input) {
@@ -1740,8 +1812,7 @@ function updateRangeFill(input) {
 function setThreshold(value) {
   state.preferences.threshold = Math.min(0.95, Math.max(0.5, value / 100));
   pose.setThreshold(state.preferences.threshold);
-  dom.thresholdValue.textContent = formatPercent(state.preferences.threshold);
-  updateRangeFill(dom.thresholdRange);
+  syncThresholdUI();
   savePreferences(state.preferences);
 }
 
@@ -1952,6 +2023,9 @@ function bindEvents() {
   dom.thresholdRange.addEventListener("input", () => {
     setThreshold(Number(dom.thresholdRange.value));
   });
+  dom.stageThresholdRange.addEventListener("input", () => {
+    setThreshold(Number(dom.stageThresholdRange.value));
+  });
   dom.holdRange.addEventListener("input", () => {
     setHold(Number(dom.holdRange.value));
   });
@@ -1962,6 +2036,7 @@ function bindEvents() {
   });
   dom.mapASelect.addEventListener("change", () => onMappingSelectChange("A"));
   dom.mapBSelect.addEventListener("change", () => onMappingSelectChange("B"));
+  dom.mapRestSelect.addEventListener("change", () => onMappingSelectChange("R"));
   dom.swapSidesButton.addEventListener("click", swapSides);
 
   document.addEventListener("visibilitychange", () => {
