@@ -4,6 +4,8 @@ A hands-free trivia game powered by your own **Teachable Machine pose model**. L
 
 ![Pose & Tell lobby](preview.png)
 
+**Live demo:** [mkpc-yaukin.github.io/MKPCTeachableMachine2710](https://mkpc-yaukin.github.io/MKPCTeachableMachine2710/)
+
 The app is a static site — no build step and no server-side code. Video frames stay in the browser; only the model files and the PoseNet engine are fetched over the network.
 
 ## Run it
@@ -97,3 +99,8 @@ serve.py                    tiny local server with webcam-friendly headers
 ## Browser support
 
 Best in a current Chrome, Edge, Safari, or Firefox on a device with a webcam. WebGL is recommended for smooth pose tracking; if WebGL is unavailable TensorFlow.js can fall back to CPU, which may be slower.
+
+## Deploy
+
+This repository is deployed with GitHub Pages from the `main` branch root. The `.nojekyll` file keeps the static vendor and asset folders untouched.
+
